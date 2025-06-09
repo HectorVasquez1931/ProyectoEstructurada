@@ -1,72 +1,4 @@
-#include "raylib.h"
-#include <stdio.h>
-#include <stdlib.h>
-#include <time.h>
-
-typedef struct
-{
-    int objetivo;
-    int numA;
-    int numB;
-    int numC;
-    int numD;
-    int numE;
-    int numF;
-
-    int resultadoJugador;
-    int clicksHechos;
-
-    bool mostrarResultado;
-    bool resultadoCorrecto;
-
-    bool botonASeleccionado;
-    bool botonBSeleccionado;
-    bool botonCSeleccionado;
-    bool botonDSeleccionado;
-    bool botonESeleccionado;
-    bool botonFSeleccionado;
-
-    Rectangle botonA;
-    Rectangle botonB;
-    Rectangle botonC;
-    Rectangle botonD;
-    Rectangle botonE;
-    Rectangle botonF;
-
-    int aciertos = 0;
-
-    bool modoResta = false;
-    bool modoMultiplicacion = false;
-    bool modoDivision = false;
-
-    // tiempo de preguntas
-    float tiempoRestante;
-    float tiempoMaximo;
-    bool tiempoAgotado;
-} Juego;
-
-typedef struct button
-{
-    Rectangle rectan;
-    Color color;
-} Ts_button;
-
-typedef struct button_circle
-{
-    int x;
-    int y;
-    int radious;
-    Color color;
-} Ts_button_circle;
-
-typedef enum
-{
-    MENU,
-    NIVEL1,
-    NIVEL2,
-    NIVE3,
-    MAPA
-} SCREEN_MODE;
+#include "juego.h"
 
 Ts_button button_0 = {0};
 Ts_button button_1 = {0};
@@ -78,16 +10,30 @@ Ts_button button_lava = {0};
 Ts_button button_nieve = {0};
 Ts_button button_final = {0};
 Ts_button button_reiniciar = {0};
-
-// funciones logica de los niveles
-Juego GenerarNuevaPreguntaSuma(Juego estructura);
-Juego GenerarNuevaPreguntaResta(Juego estructura);
-void funcion_pausa();
-Juego GenerarNuevaPreguntaMultiplicacion(Juego estructura);
-Juego GenerarNuevaPreguntaDivision(Juego estructura);
+Ts_button boton_slot1 = {0};
+Ts_button boton_slot2 = {0};
+Ts_button boton_slot3 = {0};
 
 int main()
 {
+    // CARGAR PARTIDAS
+    if (verifica_si_archivo_existe("saves.dat") == 0)
+    {
+        FILE *archivo;
+        archivo = fopen("saves.dat", "wb");
+        fclose(archivo);
+    }
+
+    Ts_partida slot1 = carga_partida(0);
+    slot1.partida = 0;
+    Ts_partida slot2 = carga_partida(1);
+    slot2.partida = 1;
+    Ts_partida slot3 = carga_partida(2);
+    slot3.partida = 2;
+    Ts_partida slot_seleccionado;
+    slot_seleccionado.status = 1;
+    /////////////////////////////////
+
     const int screenWidth = 1920;
     const int screenHeight = 1080;
     int vidas;
@@ -95,13 +41,17 @@ int main()
 
     int pausa = 0;
     int bandera_vidas = 0;
-    InitWindow(screenWidth, screenHeight, "One piece");
+    InitWindow(screenWidth, screenHeight, "OPERACION RESCATE");
     ToggleFullscreen();
     SetExitKey(0);
     InitAudioDevice();
 
     int bandera_nivel2 = 0;
     int bandera_nivel3 = 0;
+    int bandera_slot1 = 0;
+
+    int bandera_slot2 = 0;
+    int bandera_slot3 = 0;
 
     Texture2D background = LoadTexture("bosque.jpg");
     Texture2D background2 = LoadTexture("fondo2.png");
@@ -127,6 +77,8 @@ int main()
     Texture2D texto_bloqueado_nivel2 = LoadTexture("bloqueado_nivel2.png");
     Texture2D texto_bloqueado_nivel3 = LoadTexture("bloqueado_nivel3.png");
     Texture2D imagen_nivel_superado = LoadTexture("imagen_nivel_superado.png");
+    Texture2D imagen_cargar = LoadTexture("cargar_partidas_imagen.png");
+    Texture2D flecha = LoadTexture("flecha.png");
 
     // animacion del hielo
     Texture2D hielo_completo = LoadTexture("hielo_completo.jpg");
@@ -201,6 +153,9 @@ int main()
             case MENU:
                 PlayMusicStream(cancion_principal);
                 break;
+            case ESCOGER_PARTIDA:
+                PlayMusicStream(cancion_principal);
+                break;
             case NIVEL1:
                 PlayMusicStream(cancion_navidad);
                 break;
@@ -265,9 +220,129 @@ int main()
                 DrawCircleLines(centro_play.x, centro_play.y, radio_play, RED); // resaltar
                 if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT))
                 {
-                    screen = MAPA;
+                    screen = ESCOGER_PARTIDA;
                     aciertos = 0;
                 }
+            }
+        };
+        break;
+
+        case ESCOGER_PARTIDA:
+        {
+            DrawTexture(background, 0, 0, WHITE);
+            DrawTexture(imagen_cargar, (screenWidth - imagen_cargar.width) / 2 + 50, (screenHeight - imagen_cargar.height) / 2, WHITE);
+            mostrar_slots_en_pantalla(slot1, slot2, slot3, {0, 0}, fuente_letra);
+
+            boton_slot1.rectan = {450, 133, 1100, 250};
+            boton_slot2.rectan = {450, 133 + 280, 1100, 250};
+            boton_slot3.rectan = {450, 133 + 568, 1100, 250};
+
+            Vector2 posicion_texto1 = {screenWidth / 2 - 300, 250};
+            Vector2 posicion_texto2 = {screenWidth / 2 - 300, 535};
+            Vector2 posicion_texto3 = {screenWidth / 2 - 300, 820};
+
+            if (bandera_slot1 == 0 && slot1.status == 0)
+            {
+                DrawTextEx(fuente_letra, "PARTIDA VACIA", posicion_texto1, 54, 1, BLACK);
+
+                if (CheckCollisionPointRec(mouse, boton_slot1.rectan))
+                {
+                    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT))
+                    {
+                        screen = MAPA;
+                        slot_seleccionado.partida = 0;
+                        slot_seleccionado.status = 1;
+                        slot_seleccionado.nivel = 1;
+                        actualiza_partida(slot_seleccionado.partida, slot_seleccionado);
+                        bandera_slot1 = 1;
+                    }
+                }
+            }
+            else
+            {
+                DrawTextEx(fuente_letra, "PARTIDA 1", posicion_texto1, 54, 1, BLACK);
+                if (CheckCollisionPointRec(mouse, boton_slot1.rectan))
+                {
+                    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT))
+                    {
+                        screen = MAPA;
+                        slot_seleccionado = slot1;
+                        bandera_slot1 = 1;
+                    }
+                }
+            }
+
+            if (bandera_slot2 == 0 && slot2.status == 0)
+            {
+                DrawTextEx(fuente_letra, "PARTIDA VACIA", posicion_texto2, 54, 1, BLACK);
+                if (CheckCollisionPointRec(mouse, boton_slot2.rectan))
+                {
+                    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT))
+                    {
+                        screen = MAPA;
+                        slot_seleccionado.partida = 1;
+                        slot_seleccionado.status = 1;
+                        slot_seleccionado.nivel = 1;
+                        actualiza_partida(slot_seleccionado.partida, slot_seleccionado);
+                        bandera_slot2 = 1;
+                    }
+                }
+            }
+            else
+            {
+                DrawTextEx(fuente_letra, "PARTIDA 2", posicion_texto2, 54, 1, BLACK);
+                if (CheckCollisionPointRec(mouse, boton_slot2.rectan))
+                {
+                    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT))
+                    {
+                        screen = MAPA;
+                        slot_seleccionado = slot2;
+                        bandera_slot2 = 1;
+                    }
+                }
+            }
+
+            if (bandera_slot3 == 0 && slot3.status == 0)
+            {
+                DrawTextEx(fuente_letra, "PARTIDA VACIA", posicion_texto3, 54, 1, BLACK);
+                if (CheckCollisionPointRec(mouse, boton_slot3.rectan))
+                {
+                    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT))
+                    {
+                        screen = MAPA;
+                        slot_seleccionado.partida = 2;
+                        slot_seleccionado.status = 1;
+                        slot_seleccionado.nivel = 1;
+                        actualiza_partida(slot_seleccionado.partida, slot_seleccionado);
+                        bandera_nivel3 = 1;
+                    }
+                }
+            }
+            else
+            {
+                DrawTextEx(fuente_letra, "PARTIDA 3", posicion_texto3, 54, 1, BLACK);
+                if (CheckCollisionPointRec(mouse, boton_slot3.rectan))
+                {
+                    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT))
+                    {
+                        screen = MAPA;
+                        slot_seleccionado = slot3;
+                        bandera_nivel3 = 1;
+                    }
+                }
+            }
+
+            if (CheckCollisionPointRec(mouse, boton_slot1.rectan))
+            {
+                DrawTexture(flecha, 2, 200, WHITE);
+            }
+            if (CheckCollisionPointRec(mouse, boton_slot2.rectan))
+            {
+                DrawTexture(flecha, 2, 500, WHITE);
+            }
+            if (CheckCollisionPointRec(mouse, boton_slot3.rectan))
+            {
+                DrawTexture(flecha, 2, 750, WHITE);
             }
         };
         break;
@@ -283,7 +358,7 @@ int main()
 
                 if (pausa == 0)
                 {
-                    if (aciertos < 10)
+                    if (aciertos < 3)
                     {
 
                         if (!estructura.mostrarResultado && !estructura.tiempoAgotado)
@@ -685,6 +760,9 @@ int main()
                                 screen = NIVEL2;
                                 vidas = 3;
                                 bandera_nivel2 = 1;
+                                slot_seleccionado.nivel = 2;
+                                actualiza_partida(slot_seleccionado.partida, slot_seleccionado);
+
                                 aciertos = 0;
                             }
                         }
@@ -696,6 +774,9 @@ int main()
                             {
                                 screen = MAPA;
                                 bandera_nivel2 = 1;
+                                slot_seleccionado.nivel = 2;
+                                actualiza_partida(slot_seleccionado.partida, slot_seleccionado);
+
                                 aciertos = 0;
 
                                 estructura.aciertos = 0;
@@ -703,12 +784,16 @@ int main()
                                 estructura = GenerarNuevaPreguntaSuma(estructura); // o Resta si quieres
                             }
                         }
+
                         if (CheckCollisionPointCircle(GetMousePosition(), centro_reiniciar, radio_reiniciar))
                         {
                             DrawCircleLines(centro_reiniciar.x, centro_reiniciar.y, radio_reiniciar, RED); // resaltar
                             if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT))
                             {
                                 bandera_nivel2 = 1;
+                                slot_seleccionado.nivel = 2;
+                                actualiza_partida(slot_seleccionado.partida, slot_seleccionado);
+
                                 aciertos = 0;
                                 vidas = 3;
                                 bandera_vidas = 0;
@@ -834,7 +919,7 @@ int main()
                 DrawTextEx(fuente_letra, texto_continuar, posicionTexto, 34, 1, BLACK);
                 if (pausa == 0)
                 {
-                    if (aciertos < 10)
+                    if (aciertos < 3)
                     {
 
                         if (!validacion)
@@ -1273,6 +1358,9 @@ int main()
                             {
                                 screen = NIVE3;
                                 bandera_nivel3 = 1;
+                                slot_seleccionado.nivel = 3;
+                                actualiza_partida(slot_seleccionado.partida, slot_seleccionado);
+
                                 vidas = 3;
                                 aciertos = 0;
                             }
@@ -1288,6 +1376,8 @@ int main()
                                 vidas = 3;
 
                                 bandera_nivel3 = 1;
+                                slot_seleccionado.nivel = 3;
+                                actualiza_partida(slot_seleccionado.partida, slot_seleccionado);
 
                                 estructura.aciertos = 0;         // reiniciar aciertos
                                 validacion = 0;                  // reiniciar validacion para que se genere una nueva pregunta
@@ -1300,6 +1390,9 @@ int main()
                             if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT))
                             {
                                 bandera_nivel3 = 1;
+                                slot_seleccionado.nivel = 3;
+                                actualiza_partida(slot_seleccionado.partida, slot_seleccionado);
+
                                 aciertos = 0;
 
                                 vidas = 3;
@@ -1411,7 +1504,7 @@ int main()
                 DrawTextEx(fuente_letra, texto_continuar, posicionTexto, 34, 1, BLACK);
                 if (pausa == 0)
                 {
-                    if (aciertos < 10)
+                    if (aciertos < 3)
                     {
                         if (!validacionNivel3)
                         {
@@ -1986,7 +2079,6 @@ int main()
                     }
                     else
                     {
-
                         Vector2 centra_imagen = {
                             (screenWidth - imagen_nivel_superado.width) / 2.0f,
                             (screenHeight - imagen_nivel_superado.height) / 2.0f};
@@ -2015,6 +2107,8 @@ int main()
                                 aciertos = 0;
 
                                 bandera_nivel2 = 1;
+                                slot_seleccionado.nivel = 2;
+                                actualiza_partida(slot_seleccionado.partida, slot_seleccionado);
 
                                 estructura.aciertos = 0; // reiniciar aciertos
                                 validacionNivel3 = 0;    // reiniciar validacion nivel 3
@@ -2026,6 +2120,9 @@ int main()
                             if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT))
                             {
                                 bandera_nivel2 = 1;
+                                slot_seleccionado.nivel = 2;
+                                actualiza_partida(slot_seleccionado.partida, slot_seleccionado);
+
                                 vidas = 3;
                                 bandera_vidas = 0;
                                 aciertos = 0;
@@ -2132,6 +2229,12 @@ int main()
             if (IsKeyPressed(KEY_ESCAPE))
             {
                 screen = MENU;
+                slot1 = carga_partida(0);
+                slot1.partida = 0;
+                slot2 = carga_partida(1);
+                slot2.partida = 1;
+                slot3 = carga_partida(2);
+                slot3.partida = 2;
             }
 
             DrawTexture(islas, 0, 0, WHITE);
@@ -2154,7 +2257,7 @@ int main()
 
             if (CheckCollisionPointRec(mouse, button_lava.rectan))
             {
-                if (bandera_nivel2 == 0)
+                if (slot_seleccionado.nivel < 2)
                 {
                     DrawTexture(texto_bloqueado_nivel2, 750, screenHeight / 2 + 50, WHITE);
                 }
@@ -2176,7 +2279,7 @@ int main()
 
             if (CheckCollisionPointRec(mouse, button_final.rectan))
             {
-                if (bandera_nivel3 == 0)
+                if (slot_seleccionado.nivel < 3)
                 {
                     DrawTexture(texto_bloqueado_nivel3, 1300, screenHeight / 2 - 80, WHITE);
                 }
@@ -2198,6 +2301,7 @@ int main()
             }
             break;
         }
+        actualiza_partida(slot_seleccionado.partida, slot_seleccionado);
 
         EndDrawing();
     }
@@ -2217,252 +2321,4 @@ int main()
     CloseWindow(); // Close window and OpenGL context
 
     return 0;
-}
-
-Juego GenerarNuevaPreguntaSuma(Juego estructura)
-{
-    estructura.objetivo = rand() % 20 + 5;
-
-    // generar los dos numero correctos
-    int correctoA = rand() % estructura.objetivo;
-    int correctoB = estructura.objetivo - correctoA;
-
-    // generar los dos numeros incorrectos
-    int incorrectoA, incorrectoB, incorrectoC, incorrectoD;
-    do
-    {
-        incorrectoA = rand() % estructura.objetivo;
-        incorrectoB = rand() % estructura.objetivo;
-        incorrectoC = rand() % estructura.objetivo;
-        incorrectoD = rand() % estructura.objetivo;
-    } while (
-        incorrectoA + incorrectoB == estructura.objetivo ||
-        incorrectoA + incorrectoC == estructura.objetivo ||
-        incorrectoA + incorrectoD == estructura.objetivo ||
-        incorrectoB + incorrectoC == estructura.objetivo ||
-        incorrectoB + incorrectoD == estructura.objetivo ||
-        incorrectoC + incorrectoD == estructura.objetivo);
-
-    int valores[6] = {correctoA, correctoB, incorrectoA, incorrectoB, incorrectoC, incorrectoD};
-
-    // Mezclar los numeros
-    for (int i = 0; i < 6; i++)
-    {
-        int j = rand() % 6;
-        int temp = valores[i];
-        valores[i] = valores[j];
-        valores[j] = temp;
-    }
-
-    estructura.numA = valores[0];
-    estructura.numB = valores[1];
-    estructura.numC = valores[2];
-    estructura.numD = valores[3];
-    estructura.numE = valores[4];
-    estructura.numF = valores[5];
-
-    // resetear estado del juego
-    estructura.resultadoJugador = 0;
-    estructura.clicksHechos = 0;
-    estructura.mostrarResultado = false;
-
-    estructura.botonASeleccionado = false;
-    estructura.botonBSeleccionado = false;
-    estructura.botonCSeleccionado = false;
-    estructura.botonDSeleccionado = false;
-    estructura.botonESeleccionado = false;
-    estructura.botonFSeleccionado = false;
-
-    // timepo
-    estructura.tiempoMaximo = 10.0f; // 10 segundos
-    estructura.tiempoRestante = estructura.tiempoMaximo;
-    estructura.tiempoAgotado = false;
-
-    return estructura;
-}
-
-Juego GenerarNuevaPreguntaResta(Juego estructura)
-{
-    // Generar dos números donde A - B = objetivo
-    int correctoA = rand() % 10 + 15; // número entre 10 y 19
-    int correctoB = rand() % 10;      // número entre 0 y 9
-    estructura.objetivo = correctoA - correctoB;
-
-    // Generar pares incorrectos
-    int incorrectoA, incorrectoB, incorrectoC, incorrectoD;
-    do
-    {
-        incorrectoA = rand() % 25;
-        incorrectoB = rand() % 25;
-        incorrectoC = rand() % 25;
-        incorrectoD = rand() % 25;
-    } while (
-        incorrectoA - incorrectoB == estructura.objetivo ||
-        incorrectoA - incorrectoC == estructura.objetivo ||
-        incorrectoA - incorrectoD == estructura.objetivo ||
-        incorrectoB - incorrectoC == estructura.objetivo ||
-        incorrectoB - incorrectoD == estructura.objetivo ||
-        incorrectoC - incorrectoD == estructura.objetivo);
-
-    int valores[6] = {correctoA, correctoB, incorrectoA, incorrectoB, incorrectoC, incorrectoD};
-
-    // Mezclar los valores
-    for (int i = 0; i < 6; i++)
-    {
-        int j = rand() % 6;
-        int temp = valores[i];
-        valores[i] = valores[j];
-        valores[j] = temp;
-    }
-
-    estructura.numA = valores[0];
-    estructura.numB = valores[1];
-    estructura.numC = valores[2];
-    estructura.numD = valores[3];
-    estructura.numE = valores[4];
-    estructura.numF = valores[5];
-
-    estructura.resultadoJugador = 0;
-    estructura.clicksHechos = 0;
-    estructura.mostrarResultado = false;
-
-    estructura.botonASeleccionado = false;
-    estructura.botonBSeleccionado = false;
-    estructura.botonCSeleccionado = false;
-    estructura.botonDSeleccionado = false;
-    estructura.botonESeleccionado = false;
-    estructura.botonFSeleccionado = false;
-
-    // timepo
-    estructura.tiempoMaximo = 10.0f; // 10 segundos
-    estructura.tiempoRestante = estructura.tiempoMaximo;
-    estructura.tiempoAgotado = false;
-
-    return estructura;
-}
-
-void funcion_pausa()
-{
-}
-
-Juego GenerarNuevaPreguntaMultiplicacion(Juego estructura)
-{
-    // generar dos numeros pequeños
-    int correctoA = rand() % 6 + 2; // entre 2 y 7
-    int correctoB = rand() % 6 + 2; // entre 2 y 7
-    estructura.objetivo = correctoA * correctoB;
-
-    // generar pares incorrectos que no den el resultado correcto
-    int incorrectoA, incorrectoB, incorrectoC, incorrectoD;
-    do
-    {
-        incorrectoA = rand() % 10 + 1;
-        incorrectoB = rand() % 10 + 1;
-        incorrectoC = rand() % 10 + 1;
-        incorrectoD = rand() % 10 + 1;
-    } while (
-        incorrectoA * incorrectoB == estructura.objetivo ||
-        incorrectoA * incorrectoC == estructura.objetivo ||
-        incorrectoA * incorrectoD == estructura.objetivo ||
-        incorrectoB * incorrectoC == estructura.objetivo ||
-        incorrectoB * incorrectoD == estructura.objetivo ||
-        incorrectoC * incorrectoD == estructura.objetivo);
-
-    int valores[6] = {correctoA, correctoB, incorrectoA, incorrectoB, incorrectoC, incorrectoD};
-
-    // Mezclar los valores
-    for (int i = 0; i < 6; i++)
-    {
-        int j = rand() % 6;
-        int temp = valores[i];
-        valores[i] = valores[j];
-        valores[j] = temp;
-    }
-
-    estructura.numA = valores[0];
-    estructura.numB = valores[1];
-    estructura.numC = valores[2];
-    estructura.numD = valores[3];
-    estructura.numE = valores[4];
-    estructura.numF = valores[5];
-
-    // Resetear estado del juego
-    estructura.resultadoJugador = 0;
-    estructura.clicksHechos = 0;
-    estructura.mostrarResultado = false;
-
-    estructura.botonASeleccionado = false;
-    estructura.botonBSeleccionado = false;
-    estructura.botonCSeleccionado = false;
-    estructura.botonDSeleccionado = false;
-    estructura.botonESeleccionado = false;
-    estructura.botonFSeleccionado = false;
-
-    // timepo
-    estructura.tiempoMaximo = 10.0f; // 10 segundos
-    estructura.tiempoRestante = estructura.tiempoMaximo;
-    estructura.tiempoAgotado = false;
-
-    return estructura;
-}
-
-Juego GenerarNuevaPreguntaDivision(Juego estructura)
-{
-    int correctoB = rand() % 9 + 2;       // entre 2 y 10
-    int objetivo = rand() % 10 + 1;       // resultado deseado entre 1 y 10
-    int correctoA = correctoB * objetivo; // A = B * objetivo → división exacta
-
-    estructura.objetivo = objetivo;
-
-    // Generar números incorrectos
-    int incorrectoA, incorrectoB, incorrectoC, incorrectoD;
-    do
-    {
-        incorrectoA = rand() % 20 + 1;
-        incorrectoB = rand() % 20 + 1;
-        incorrectoC = rand() % 20 + 1;
-        incorrectoD = rand() % 20 + 1;
-    } while (
-        (incorrectoA != 0 && correctoA / incorrectoA == objetivo) ||
-        (incorrectoB != 0 && correctoA / incorrectoB == objetivo) ||
-        (incorrectoC != 0 && correctoA / incorrectoC == objetivo) ||
-        (incorrectoD != 0 && correctoA / incorrectoD == objetivo));
-
-    // Colocar los números en un array
-    int valores[6] = {correctoA, correctoB, incorrectoA, incorrectoB, incorrectoC, incorrectoD};
-
-    // Mezclar los valores
-    for (int i = 0; i < 6; i++)
-    {
-        int j = rand() % 6;
-        int temp = valores[i];
-        valores[i] = valores[j];
-        valores[j] = temp;
-    }
-
-    estructura.numA = valores[0];
-    estructura.numB = valores[1];
-    estructura.numC = valores[2];
-    estructura.numD = valores[3];
-    estructura.numE = valores[4];
-    estructura.numF = valores[5];
-
-    // Resetear estado
-    estructura.resultadoJugador = 0;
-    estructura.clicksHechos = 0;
-    estructura.mostrarResultado = false;
-
-    estructura.botonASeleccionado = false;
-    estructura.botonBSeleccionado = false;
-    estructura.botonCSeleccionado = false;
-    estructura.botonDSeleccionado = false;
-    estructura.botonESeleccionado = false;
-    estructura.botonFSeleccionado = false;
-
-    // timepo
-    estructura.tiempoMaximo = 10.0f; // 10 segundos
-    estructura.tiempoRestante = estructura.tiempoMaximo;
-    estructura.tiempoAgotado = false;
-
-    return estructura;
 }
